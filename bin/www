@@ -1,0 +1,139 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var http = require('http');
+var { Server } = require('socket.io');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+/**
+ * TÍCH HỢP SOCKET.IO CHO TÍNH NĂNG ĐẶT VÉ REAL-TIME
+ */
+var io = new Server(server, {
+  cors: {
+    origin: "*", // Cho phép mọi Frontend (React, Vue, Mobile) kết nối tới
+    methods: ["GET", "POST"]
+  }
+});
+
+// Gắn io vào app để nếu cần có thể lấy ra dùng ở Controller
+app.set('socketio', io);
+
+io.on('connection', function(socket) {
+  console.log('Mot nguoi dung vua ket noi Socket.IO:', socket.id);
+
+  // 1. Khi người dùng bấm vào xem sơ đồ ghế của 1 chuyến xe (Tham gia phòng)
+  socket.on('join_trip', function(tripId) {
+    socket.join(tripId);
+    console.log(`User ${socket.id} da tham gia xem chuyen xe: ${tripId}`);
+  });
+
+  // 2. Khi người dùng click chọn 1 ghế (Đang giữ ghế, chưa thanh toán)
+  socket.on('hold_seat', function(data) {
+    // data gửi lên gồm: { tripId: '...', seatNumber: 'A1', user: '...' }
+    console.log(`Ghe ${data.seatNumber} dang duoc giu boi user trong chuyen ${data.tripId}`);
+    
+    // Bắn sự kiện 'seat_held_by_other' cho TẤT CẢ những người khác đang xem cùng chuyến xe này
+    // Để frontend của họ chuyển ghế A1 sang màu xám (không cho bấm vào nữa)
+    socket.to(data.tripId).emit('seat_held_by_other', {
+      seatNumber: data.seatNumber,
+      message: "Ghe nay dang duoc nguoi khac chon"
+    });
+  });
+
+  // 3. Khi người dùng bỏ chọn ghế
+  socket.on('unhold_seat', function(data) {
+    // Bắn sự kiện báo cho người khác biết ghế này đã trống trở lại
+    socket.to(data.tripId).emit('seat_freed', {
+      seatNumber: data.seatNumber
+    });
+  });
+
+  socket.on('disconnect', function() {
+    console.log('User ngat ket noi:', socket.id);
+  });
+});
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  console.log('Dang chay Server RESTful API tai cong: ' + bind);
+  console.log('Socket.IO cung da san sang!');
+}
