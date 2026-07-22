@@ -12,7 +12,6 @@ function Booking() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Gọi song song 2 API: Lấy thông tin chuyến xe & Lấy danh sách toàn bộ vé
         const [tripRes, ticketRes] = await Promise.all([
           fetch('https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/api/v1/trips'),
           fetch('https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/tickets') 
@@ -25,7 +24,6 @@ function Booking() {
           const currentTrip = tripData.data.find(t => t.tripId === id);
 
           if (currentTrip) {
-            // 2. Gán thông tin chuyến xe
             setTrip({
               _id: currentTrip.tripId,
               name: `${currentTrip.departure} - ${currentTrip.destination}`,
@@ -38,43 +36,32 @@ function Booking() {
               bus: { licensePlate: "Đang cập nhật", type: "Giường nằm" }
             });
 
-            // 3. LỌC RA CÁC GHẾ ĐÃ CÓ NGƯỜI ĐẶT CỦA CHUYẾN XE NÀY TỪ DYNAMODB
             const bookedSeatNames = [];
             if (ticketData.success && ticketData.data) {
               ticketData.data.forEach(ticket => {
-                // Chỉ khóa ghế nếu vé thuộc chuyến này và KHÔNG phải trạng thái CANCELLED (Đã hủy)
                 if (ticket.tripId === id && ticket.status !== 'CANCELLED') {
                   bookedSeatNames.push(ticket.seatName);
                 }
               });
             }
-
-            // 4. TẠO SƠ ĐỒ GHẾ VÀ CẬP NHẬT TRẠNG THÁI THỰC TẾ
             const totalSeats = parseInt(currentTrip.availableSeats) || 34; 
-            const rows = Math.ceil(totalSeats / 2); // Chia 2 vì xe có dãy A và dãy B
+            const rows = Math.ceil(totalSeats / 2); 
             const generatedSeats = [];
             
             for (let i = 1; i <= rows; i++) {
-              // Ghế dãy A
               generatedSeats.push({ 
                 _id: `s-A${i}`, 
                 seatNumber: `A${i}`, 
-                // Kiểm tra xem ghế này có nằm trong danh sách đã đặt không
                 status: bookedSeatNames.includes(`A${i}`) ? "BOOKED" : "AVAILABLE" 
-              });
-              
-              // Ghế dãy B (Chặn không cho tạo thêm ghế bị dư nếu số lượng là số lẻ)
+              });          
               if (generatedSeats.length < totalSeats) {
                 generatedSeats.push({ 
                   _id: `s-B${i}`, 
                   seatNumber: `B${i}`, 
-                  // Kiểm tra xem ghế này có nằm trong danh sách đã đặt không
                   status: bookedSeatNames.includes(`B${i}`) ? "BOOKED" : "AVAILABLE" 
                 });
               }
             }
-
-            // Gán danh sách ghế thực tế vào state
             setSeats(generatedSeats);
 
           } else {
@@ -96,14 +83,10 @@ function Booking() {
     if (seat.status !== 'AVAILABLE') return;
     setSelectedSeat(selectedSeat?._id === seat._id ? null : seat);
   };
-
-  // --- HÀM GỌI API LÊN AWS ĐỂ LƯU VÉ VÀO DYNAMODB ---
   const handleBooking = async () => {
     if (!selectedSeat) return alert('Vui lòng chọn 1 ghế');
     
     alert(`Đang xử lý đặt ghế ${selectedSeat.seatNumber}... Vui lòng đợi!`);
-
-    // Gói dữ liệu gửi lên AWS 
     const bookingData = {
       tripId: trip._id, 
       userEmail: "hungtang22222@gmail.com", 
@@ -112,7 +95,6 @@ function Booking() {
     };
 
     try {
-      // Gọi API Gateway của AWS
       const response = await fetch('https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/tickets', {
         method: 'POST',
         headers: {
@@ -124,8 +106,7 @@ function Booking() {
       const result = await response.json();
 
       if (result.success) {
-        alert(`🎉 Đặt vé thành công! Mã vé: ${result.data.ticketId}`);
-        // Chuyển hướng sang trang Vé Của Tôi
+        alert(` Đặt vé thành công! Mã vé: ${result.data.ticketId}`);
         navigate('/my-tickets'); 
       } else {
         alert('❌ Có lỗi từ server: ' + result.message);
