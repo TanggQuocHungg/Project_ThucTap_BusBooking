@@ -12,7 +12,6 @@ function Home() {
     const fetchTrips = async () => {
       try {
         const response = await api.get('/trips');
-        // Lambda của chúng ta trả về body là { success: true, data: [...] }
         setTrips(response.data.data); 
       } catch (error) {
         console.error("Lỗi khi tải dữ liệu:", error);
