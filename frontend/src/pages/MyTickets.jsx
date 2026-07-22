@@ -6,8 +6,6 @@ import { Ticket, Star, MessageSquare, X, CreditCard } from 'lucide-react';
 function MyTickets() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // States cho Popup Đánh giá
   const [showModal, setShowModal] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState('');
   const [rating, setRating] = useState(5);
@@ -15,16 +13,13 @@ function MyTickets() {
 
   const location = useLocation();
   const navigate = useNavigate();
-
-  // --- 1. BẮT KẾT QUẢ TỪ VNPAY TRẢ VỀ ---
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const vnp_ResponseCode = params.get('vnp_ResponseCode');
-    const vnp_TxnRef = params.get('vnp_TxnRef'); // Đây chính là ticketId
+    const vnp_TxnRef = params.get('vnp_TxnRef')
 
     if (vnp_ResponseCode) {
       if (vnp_ResponseCode === '00') {
-        // KHÁCH THANH TOÁN THÀNH CÔNG: Gọi Lambda cập nhật trạng thái vé
         fetch(`https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/tickets/${vnp_TxnRef}/confirm`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' }
@@ -37,19 +32,13 @@ function MyTickets() {
            }
         });
       } else {
-        // KHÁCH HỦY HOẶC LỖI THẺ
         alert('❌ Giao dịch chưa hoàn tất hoặc thất bại (Mã lỗi VNPAY: ' + vnp_ResponseCode + ')');
       }
-      
-      // Xóa cái đuôi URL dài thòng lọng đi cho web đẹp lại
       navigate('/my-tickets', { replace: true });
     }
   }, [location, navigate]);
-
-// --- 2. TẢI DANH SÁCH VÉ TỪ AWS DYNAMODB ---
   const fetchTickets = async () => {
     try {
-      // Gọi song song 2 API: lấy vé và lấy chuyến đi để đối chiếu tên tuyến đường
       const [ticketsRes, tripsRes] = await Promise.all([
         fetch('https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/tickets'),
         fetch('https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/api/v1/trips')
@@ -59,16 +48,12 @@ function MyTickets() {
       const tripsData = await tripsRes.json();
       
       if (ticketsData.success && ticketsData.data) {
-        // Tạo một từ điển (map) để tra cứu nhanh thông tin chuyến xe dựa vào tripId
         const tripMap = {};
         if (tripsData.success && tripsData.data) {
           tripsData.data.forEach(t => tripMap[t.tripId] = t);
         }
-
-        // Đồng bộ cấu trúc dữ liệu từ DynamoDB sang giao diện React
         const formattedTickets = ticketsData.data.map(item => {
-          const matchedTrip = tripMap[item.tripId] || {}; // Lấy đúng chuyến xe TRP-001
-          
+          const matchedTrip = tripMap[item.tripId] || {}; 
           return {
             _id: item.ticketId,
             status: item.status,
@@ -84,8 +69,6 @@ function MyTickets() {
             seats: [{ seatNumber: item.seatName }]
           };
         });
-        
-        // Đảo ngược mảng để vé vừa đặt hiển thị lên trên cùng
         setTickets(formattedTickets.reverse());
       } else {
         setTickets([]);
@@ -101,10 +84,8 @@ function MyTickets() {
     fetchTickets();
   }, []);
 
- // --- 3. GỌI API TẠO LINK VNPAY TỪ AWS ---
   const handlePayment = async (ticket) => {
     try {
-      // Bắn dữ liệu (POST) lên API Gateway mới tạo
       const res = await fetch('https://xi4e4dh6vf.execute-api.us-east-1.amazonaws.com/payments/create_payment_url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +100,6 @@ function MyTickets() {
       
       const vnpayUrl = result.data?.url; 
       if (result.success && vnpayUrl) {
-        // Mở link Sandbox VNPay
         window.location.href = vnpayUrl;
       } else {
         alert('Không lấy được link thanh toán từ hệ thống.');
@@ -141,7 +121,7 @@ function MyTickets() {
         
         if (data.success) {
           alert('Đã hủy vé thành công!');
-          fetchTickets(); // Gọi lại hàm tải danh sách để cập nhật giao diện ngay lập tức
+          fetchTickets(); 
         } else {
           alert('Lỗi: ' + data.message);
         }
@@ -150,8 +130,6 @@ function MyTickets() {
     }
     }
   };
-
-  // --- HÀM MỞ POPUP ĐÁNH GIÁ ---
   const openReviewModal = (tripId) => {
     setSelectedTripId(tripId);
     setRating(5);
